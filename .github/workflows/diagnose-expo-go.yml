@@ -1,0 +1,37 @@
+# Temporary: diagnose why Expo Go can't load the published update. Delete once resolved.
+name: Diagnose Expo Go
+
+on: workflow_dispatch
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Query update metadata and Expo Go manifest response
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PROJECT_ID: 08996c47-64d7-45fd-b395-a40390e55765
+        run: |
+          set -u
+          echo "== whoami"
+          curl -sS https://api.expo.dev/graphql -H "Authorization: Bearer $EXPO_TOKEN" -H 'content-type: application/json' \
+            -d '{"query":"{ meActor { __typename id ... on User { username } ... on Robot { firstName } accounts { name } } }"}'
+          echo; echo "== latest updates"
+          curl -sS https://api.expo.dev/graphql -H "Authorization: Bearer $EXPO_TOKEN" -H 'content-type: application/json' \
+            -d "{\"query\":\"{ app { byId(appId: \\\"$PROJECT_ID\\\") { fullName privacy sdkVersion updates(offset: 0, limit: 4) { id group platform runtimeVersion expoGoSDKVersion manifestPermalink createdAt } } } }\"}"
+          for auth in none bearer; do
+            echo; echo "== manifest request as Expo Go (auth: $auth)"
+            extra=()
+            if [ "$auth" = bearer ]; then extra=(-H "Authorization: Bearer $EXPO_TOKEN"); fi
+            curl -sS -o body.txt -w "HTTP %{http_code}\n" "${extra[@]}" \
+              -H "Accept: multipart/mixed,application/expo+json,application/json" \
+              -H "Expo-Platform: android" -H "Expo-Protocol-Version: 1" -H "Expo-API-Version: 1" \
+              -H "Expo-Updates-Environment: EXPO_DEVICE" -H "Expo-Client-Environment: EXPO_DEVICE" \
+              -H "Expo-Runtime-Version: exposdk:57.0.0" -H "Exponent-Accept-Signature: true" \
+              -H "Exponent-Platform: android" -H "Exponent-SDK-Version: 57.0.0" \
+              -H 'expo-expect-signature: sig, keyid="expo-root", alg="rsa-v1_5-sha256"' \
+              "https://u.expo.dev/$PROJECT_ID?channel-name=main"
+            head -c 400 body.txt; echo
+          done

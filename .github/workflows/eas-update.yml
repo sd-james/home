@@ -25,13 +25,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Check Expo project ID is set
-        run: |
-          if grep -q REPLACE_WITH_EXPO_PROJECT_ID app.json; then
-            echo "Replace REPLACE_WITH_EXPO_PROJECT_ID in app.json with the Expo project ID."
-            exit 1
-          fi
-
       - name: Setup Node
         uses: actions/setup-node@v6
         with:

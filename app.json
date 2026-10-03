@@ -25,11 +25,11 @@
       "policy": "sdkVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/REPLACE_WITH_EXPO_PROJECT_ID"
+      "url": "https://u.expo.dev/08996c47-64d7-45fd-b395-a40390e55765"
     },
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EXPO_PROJECT_ID"
+        "projectId": "08996c47-64d7-45fd-b395-a40390e55765"
       }
     }
   }

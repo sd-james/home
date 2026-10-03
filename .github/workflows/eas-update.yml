@@ -1,0 +1,53 @@
+name: EAS Update
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: eas-update-main
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Publish to Expo Go
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "You must provide an EXPO_TOKEN secret linked to this project's Expo account in this repo's secrets. Learn more: https://docs.expo.dev/eas-update/github-actions"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check Expo project ID is set
+        run: |
+          if grep -q REPLACE_WITH_EXPO_PROJECT_ID app.json; then
+            echo "Replace REPLACE_WITH_EXPO_PROJECT_ID in app.json with the Expo project ID."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish update
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: eas update --branch main --message "$MESSAGE" --environment production --non-interactive

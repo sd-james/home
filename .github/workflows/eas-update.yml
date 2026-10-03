@@ -43,4 +43,4 @@ jobs:
       - name: Publish update
         env:
           MESSAGE: ${{ github.event.head_commit.message }}
-        run: eas update --branch main --message "$MESSAGE" --environment production --non-interactive
+        run: eas update --channel main --message "$MESSAGE" --environment production --non-interactive

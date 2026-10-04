@@ -15,5 +15,5 @@ jobs:
         run: |
           curl -sS --fail-with-body https://api.expo.dev/graphql \
             -H "Authorization: Bearer $EXPO_TOKEN" -H 'content-type: application/json' \
-            -d '{"query":"mutation { me { updateApp(appData: { id: \"08996c47-64d7-45fd-b395-a40390e55765\", privacy: \"unlisted\" }) { id fullName privacy } } }"}' | tee out.json
-          grep -q '"privacy":"unlisted"' out.json
+            -d '{"query":"mutation { me { updateApp(appData: { id: \"08996c47-64d7-45fd-b395-a40390e55765\", privacy: \"UNLISTED\" }) { id fullName privacy } } }"}' | tee out.json
+          grep -qi privacy:unlisted out.json

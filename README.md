@@ -3,7 +3,7 @@
 An Android app (Expo SDK 58) with three tabs:
 
 - **Devices**: weekly on/off schedules for Google Home devices, exchanged with Google Home as automation scripts (copy out, import in).
-- **Visitor Code**: gets a Les Maisons gate code automatically by SMS (sends the request, reads the reply) and shares it. Falls back to the SMS app and pasting the reply.
+- **Visitor Code**: gets a Les Maisons gate code automatically by SMS (sends the request, reads the reply) and shares it.
 - **Settings**: estate number, request format, default uses, visitor message, and app updates.
 
 See CLAUDE.md for the code structure and rules.

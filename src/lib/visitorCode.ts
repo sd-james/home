@@ -29,6 +29,15 @@ export function isExpired(code: Pick<VisitorCode, 'expiresAt'>, now = new Date()
   return code.expiresAt !== null && new Date(code.expiresAt).getTime() < now.getTime();
 }
 
+/** Codes whose expiry couldn't be read are kept for a day. */
+const UNKNOWN_EXPIRY_KEEP_MS = 24 * 60 * 60 * 1000;
+
+/** Whether a recent code should still be listed: not expired. */
+export function isStillValid(code: Pick<VisitorCode, 'expiresAt' | 'requestedAt'>, now = new Date()): boolean {
+  if (code.expiresAt !== null) return !isExpired(code, now);
+  return now.getTime() - new Date(code.requestedAt).getTime() < UNKNOWN_EXPIRY_KEEP_MS;
+}
+
 export function fillTemplate(
   template: string,
   code: Pick<VisitorCode, 'code' | 'uses' | 'expiresAt' | 'expiryText'>

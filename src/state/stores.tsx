@@ -4,6 +4,7 @@ import { DAYS, normalizeTime } from '@/lib/days';
 import { normalizeEvents } from '@/lib/schedule';
 import { DEFAULT_SETTINGS, clampUses } from '@/lib/settings';
 import type { Day, Device, ScheduleEvent, Settings, VisitorCode } from '@/lib/types';
+import { isStillValid } from '@/lib/visitorCode';
 
 import { createPersistedStore } from './createPersistedStore';
 
@@ -61,6 +62,7 @@ function reviveVisitorCodes(stored: unknown): VisitorCode[] {
       expiryText: typeof c.expiryText === 'string' ? c.expiryText : null,
       requestedAt: str(c.requestedAt, new Date(0).toISOString()),
     }))
+    .filter((c) => isStillValid(c))
     .slice(0, MAX_RECENT_CODES);
 }
 
@@ -72,9 +74,11 @@ export const useDevicesStore = devices.useStore;
 export const useSettingsStore = settings.useStore;
 export const useVisitorCodesStore = visitorCodes.useStore;
 
-/** Adds a code to the front of the recent list, replacing an identical one. */
+/** Adds a code to the front of the recent list, replacing an identical one and dropping expired ones. */
 export function withRecentCode(list: VisitorCode[], code: VisitorCode): VisitorCode[] {
-  const rest = list.filter((c) => !(c.code === code.code && c.expiresAt === code.expiresAt));
+  const rest = list.filter(
+    (c) => isStillValid(c) && !(c.code === code.code && c.expiresAt === code.expiresAt)
+  );
   return [code, ...rest].slice(0, MAX_RECENT_CODES);
 }
 

@@ -1,29 +1,27 @@
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 
 import { UsesStepper } from '@/components/pickers';
 import { colors, spacing } from '@/components/theme';
 import { Button, Card, Label, Muted, Screen } from '@/components/ui';
-import { ManualReplyCard } from '@/components/visitor/ManualReplyCard';
 import { RecentCodes } from '@/components/visitor/RecentCodes';
 import { ShareCodeCard } from '@/components/visitor/ShareCodeCard';
 import { REPLY_TIMEOUT_MS, isAutoCodeAvailable, sendCodeRequest, waitForCodeReply } from '@/lib/autoCode';
 import type { ParsedReply } from '@/lib/codeReply';
 import { newId } from '@/lib/id';
 import { clampUses } from '@/lib/settings';
-import { composeSms } from '@/lib/sms';
 import { ensureSmsPermissions } from '@/lib/smsPermissions';
 import type { VisitorCode } from '@/lib/types';
-import { buildRequestMessage } from '@/lib/visitorCode';
+import { buildRequestMessage, isStillValid } from '@/lib/visitorCode';
 import { useSettingsStore, useVisitorCodesStore, withRecentCode } from '@/state/stores';
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'sending' }
   | { kind: 'waiting'; since: number; deadline: number }
-  /** The automatic flow didn't work; show the manual flow with the reason. */
-  | { kind: 'manual'; reason: string | null; canWaitAgain?: { since: number }; permissionBlocked?: boolean };
+  /** The automatic flow didn't work; explain why and offer what can be done. */
+  | { kind: 'failed'; reason: string; canWaitAgain?: { since: number }; permissionBlocked?: boolean };
 
 export default function VisitorCodeScreen() {
   const { value: settings } = useSettingsStore();
@@ -35,7 +33,7 @@ export default function VisitorCodeScreen() {
   const uses = pickedUses ?? settings.defaultUses;
   const requestMessage = buildRequestMessage(settings.requestFormat, uses);
 
-  const [phase, setPhase] = useState<Phase>(auto ? { kind: 'idle' } : { kind: 'manual', reason: null });
+  const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [current, setCurrent] = useState<VisitorCode | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -56,16 +54,13 @@ export default function VisitorCodeScreen() {
 
   const remember = (code: VisitorCode) => setRecent((list) => withRecentCode(list, code));
 
-  /** Shows a code; `save` adds it to recent codes now (typed codes are saved once used). */
-  const showCode = (reply: ParsedReply, { copied, save }: { copied: boolean; save: boolean }) => {
+  const showCode = (reply: ParsedReply) => {
     const code: VisitorCode = { id: newId(), requestedAt: new Date().toISOString(), ...reply };
     setCurrent(code);
-    if (save) remember(code);
-    setNote(copied ? 'Code copied to the clipboard.' : null);
+    remember(code);
+    setNote('Code copied to the clipboard.');
     scrollToShare.current = true;
   };
-
-  const openSmsApp = () => composeSms(settings.estateNumber, requestMessage);
 
   const wait = async (since: number) => {
     const controller = new AbortController();
@@ -76,11 +71,11 @@ export default function VisitorCodeScreen() {
     if (controller.signal.aborted && result.kind !== 'code') return;
     if (result.kind === 'code') {
       await Clipboard.setStringAsync(result.reply.code);
-      showCode(result.reply, { copied: true, save: true });
+      showCode(result.reply);
       setPhase({ kind: 'idle' });
     } else if (result.kind === 'timeout') {
       setPhase({
-        kind: 'manual',
+        kind: 'failed',
         reason: 'No reply from the estate within 2 minutes.',
         canWaitAgain: { since },
       });
@@ -91,14 +86,13 @@ export default function VisitorCodeScreen() {
     const permission = await ensureSmsPermissions();
     if (permission !== 'granted') {
       setPhase({
-        kind: 'manual',
+        kind: 'failed',
         reason:
           permission === 'blocked'
-            ? 'SMS permission is off for Home. Allow it in the phone’s settings to get codes automatically.'
-            : 'Without SMS permission, request the code from your SMS app.',
+            ? 'SMS permission is off for Home. Allow it in the phone’s settings, then try again.'
+            : 'Home needs SMS permission to request the code.',
         permissionBlocked: permission === 'blocked',
       });
-      await openSmsApp();
       return;
     }
     setPhase({ kind: 'sending' });
@@ -107,7 +101,7 @@ export default function VisitorCodeScreen() {
       since = await sendCodeRequest(settings.estateNumber, requestMessage);
     } catch (e) {
       setPhase({
-        kind: 'manual',
+        kind: 'failed',
         reason: e instanceof Error ? e.message : 'The SMS couldn’t be sent.',
       });
       return;
@@ -117,7 +111,7 @@ export default function VisitorCodeScreen() {
 
   const cancel = () => {
     abortRef.current?.abort();
-    setPhase({ kind: 'manual', reason: 'Stopped waiting. If the reply comes in, paste it below.' });
+    setPhase({ kind: 'idle' });
   };
 
   const busy = phase.kind === 'sending' || phase.kind === 'waiting';
@@ -128,28 +122,41 @@ export default function VisitorCodeScreen() {
       <Card>
         <Label>Visitor gate code</Label>
         <UsesStepper value={uses} onChange={(n) => setPickedUses(clampUses(n))} />
-        {auto ? (
-          busy ? (
-            <View style={styles.waiting}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.waitingText}>
-                {phase.kind === 'sending'
-                  ? `Sending “${requestMessage}”…`
-                  : `Waiting for reply… ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
-              </Text>
-              {phase.kind === 'waiting' ? <Button title="Cancel" variant="ghost" onPress={cancel} /> : null}
-            </View>
-          ) : (
-            <>
-              <Button big title={`Get code (${requestMessage})`} onPress={getCode} />
-              <Muted>
-                Texts “{requestMessage}” to {settings.estateNumber} and waits for the code.
-              </Muted>
-            </>
-          )
+        {!auto ? (
+          <Muted>This phone can’t send SMS, so Home can’t request codes.</Muted>
+        ) : busy ? (
+          <View style={styles.waiting}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.waitingText}>
+              {phase.kind === 'sending'
+                ? `Sending “${requestMessage}”…`
+                : `Waiting for reply… ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
+            </Text>
+            {phase.kind === 'waiting' ? <Button title="Cancel" variant="ghost" onPress={cancel} /> : null}
+          </View>
         ) : (
-          <Muted>This phone can’t send SMS from Home, so request the code by hand below.</Muted>
+          <>
+            <Button big title={`Get code (${requestMessage})`} onPress={getCode} />
+            <Muted>
+              Texts “{requestMessage}” to {settings.estateNumber} and waits for the code.
+            </Muted>
+          </>
         )}
+        {phase.kind === 'failed' ? (
+          <View style={styles.failed}>
+            <Text style={styles.failedText}>{phase.reason}</Text>
+            {phase.canWaitAgain ? (
+              <Button
+                title="Keep waiting"
+                variant="secondary"
+                onPress={() => phase.canWaitAgain && wait(phase.canWaitAgain.since)}
+              />
+            ) : null}
+            {phase.permissionBlocked ? (
+              <Button title="Open phone settings" variant="secondary" onPress={() => Linking.openSettings()} />
+            ) : null}
+          </View>
+        ) : null}
       </Card>
 
       {current ? (
@@ -167,34 +174,8 @@ export default function VisitorCodeScreen() {
         />
       ) : null}
 
-      {phase.kind === 'manual' ? (
-        <>
-          {phase.canWaitAgain ? (
-            <Button
-              title="Keep waiting for the reply"
-              variant="secondary"
-              onPress={() => phase.canWaitAgain && wait(phase.canWaitAgain.since)}
-            />
-          ) : null}
-          {phase.permissionBlocked ? (
-            <Button title="Open phone settings" variant="secondary" onPress={() => Linking.openSettings()} />
-          ) : null}
-          <ManualReplyCard
-            requestMessage={requestMessage}
-            estateNumber={settings.estateNumber}
-            reason={phase.reason}
-            onOpenSmsApp={openSmsApp}
-            onReply={(reply, pasted) => showCode(reply, { copied: false, save: pasted })}
-          />
-        </>
-      ) : auto && !busy ? (
-        <Pressable onPress={() => setPhase({ kind: 'manual', reason: null })} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.link}>Enter a reply by hand</Text>
-        </Pressable>
-      ) : null}
-
       <RecentCodes
-        codes={recent}
+        codes={recent.filter((code) => isStillValid(code))}
         selectedId={current?.id ?? null}
         onSelect={(code) => {
           setCurrent(code);
@@ -210,5 +191,6 @@ export default function VisitorCodeScreen() {
 const styles = StyleSheet.create({
   waiting: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   waitingText: { fontSize: 18, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
-  link: { fontSize: 16, color: colors.primary, fontWeight: '600', textAlign: 'center', paddingVertical: spacing.sm },
+  failed: { gap: spacing.sm },
+  failedText: { fontSize: 15, fontWeight: '600', color: colors.danger },
 });

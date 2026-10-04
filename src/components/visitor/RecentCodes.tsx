@@ -1,7 +1,7 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { VisitorCode } from '@/lib/types';
-import { describeExpiry, formatDateTime, isExpired } from '@/lib/visitorCode';
+import { describeExpiry, formatDateTime } from '@/lib/visitorCode';
 
 import { colors, radius, spacing } from '../theme';
 import { Card, Label, Muted } from '../ui';
@@ -18,9 +18,8 @@ export function RecentCodes({ codes, selectedId, onSelect, onRemove }: Props) {
   return (
     <Card>
       <Label>Recent codes</Label>
-      <Muted>Tap one to share it again. Long-press to remove it.</Muted>
+      <Muted>Tap one to share it again. Codes disappear when they expire.</Muted>
       {codes.map((code) => {
-        const old = isExpired(code);
         return (
           <Pressable
             key={code.id}
@@ -35,14 +34,13 @@ export function RecentCodes({ codes, selectedId, onSelect, onRemove }: Props) {
             style={({ pressed }) => [
               styles.row,
               code.id === selectedId && styles.selected,
-              old && { opacity: 0.45 },
               pressed && { opacity: 0.6 },
             ]}>
             <Text style={styles.code}>{code.code}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.meta}>
                 {code.uses === null ? '?' : code.uses} {code.uses === 1 ? 'use' : 'uses'} ·{' '}
-                {old ? 'expired' : `until ${describeExpiry(code)}`}
+                until {describeExpiry(code)}
               </Text>
               <Text style={styles.date}>Requested {formatDateTime(code.requestedAt)}</Text>
             </View>

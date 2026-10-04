@@ -1,6 +1,8 @@
 # Home
 
-An Expo app (SDK 57) that runs in Expo Go.
+An Expo app (SDK 58) that runs in Expo Go.
+
+On Android, use Expo Go 58.0.2 or later (https://github.com/expo/expo-go-releases/releases). Expo Go 57.0.9 does not send your sign-in when downloading updates, so it cannot open this (private) project.
 
 ## Develop
 

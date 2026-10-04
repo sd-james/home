@@ -57,6 +57,12 @@ modules/
   sms/                        Local Expo module "HomeSms" (Kotlin, Android only)
     index.ts                  JS API: sendSms, readInbox, addSmsListener, canSendSms
     android/…/HomeSmsModule.kt
+  googlehome/                 Local Expo module "GoogleHome" (Kotlin, Android only)
+    index.ts                  JS API: permissions, listDevices, setOnOff
+    android/maven/            Vendored Google Home APIs SDK 17.1.0 (.aar/.pom only)
+    android/…/GoogleHome.kt   The single HomeClient + registered device types/traits
+    android/…/GoogleHomePackage.kt  Registers the main activity for the consent screen
+    android/…/GoogleHomeModule.kt
 ```
 
 - Screens stay thin: put logic in `src/lib/` and shared state in `src/state/stores.tsx`. A new feature (e.g. shared lists) gets its own route(s), a `lib/` module, a store in `stores.tsx` and, if needed, a `components/<feature>/` folder.
@@ -66,7 +72,17 @@ modules/
 - Icons: `@expo/vector-icons` (MaterialCommunityIcons). It is JS + fonts on top of `expo-font`, which is already in the build, so it doesn't change the fingerprint.
 - Keep it usable with one thumb: big buttons (`TOUCH` = 52px minimum), bottom sheets, few taps.
 
-## Google Home schedules
+## Google Home APIs (direct connection)
+
+Replacing the script copy/paste (in progress). Step 1, done: connect, list on/off devices with rooms, switch them (`components/devices/GoogleHomeCard.tsx`). Step 2, next: schedules saved as automations through the Automation API, replacing `googleHomeScript.ts`.
+
+- **SDK:** Google Home APIs for Android, `play-services-home` + `play-services-home-types` 17.1.0. Not on Google Maven: downloaded from https://storage.googleapis.com/home_sdk_android/home.android.sdk_1_11_0.zip and kept in `modules/googlehome/android/maven` (javadoc and checksums removed); the module's `build.gradle` adds that repo to every Gradle project. Compiled with a newer Kotlin than React Native's, so the module uses `-Xskip-metadata-version-check`.
+- **Access:** an Android OAuth client in the user's Google Cloud project (package `com.stevenjames.home` + the EAS keystore's SHA-1), consent screen in testing mode with the user as test user. No Play Store or Google review needed for test users.
+- **Consent:** `registerActivityResultCallerForPermissions` must run in the activity's `onCreate`, done by `GoogleHomePackage`'s `ReactActivityLifecycleListener`. The app gets one home (structure); "Change home or devices" re-opens Google's consent screen.
+- **Only registered device types/traits are visible** (`GoogleHome.kt` FactoryRegistry): plugs, lights and light switches with `OnOff`. Add types there (new build) if a device is missing.
+- **Automation API limits** (for step 2): an app can only read automations it created itself; 64 automations per home; scheduled starters need the home to have a street address in the Google Home app.
+
+## Google Home schedules (scripts — being replaced)
 
 The app can't talk to Google Home directly (yet), so schedules are exchanged as **Google Home automation scripts** (the YAML in the script editor at https://home.google.com). All reading and writing of scripts is in `src/lib/googleHomeScript.ts`, so a direct Google Home connection can later replace it behind the same functions.
 

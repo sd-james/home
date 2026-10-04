@@ -1,0 +1,39 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.stevenjames.home'
+version = '1.0.0'
+
+// The Google Home APIs SDK isn't published to Google's Maven repository; it is
+// downloaded from https://developers.home.google.com/apis/android/sdk and
+// kept in ./maven (only the .aar/.pom files). The app project resolves this
+// module's dependencies too, so every project needs the repository.
+def homeSdkRepo = file("${projectDir}/maven")
+rootProject.allprojects {
+  repositories {
+    maven { url = homeSdkRepo }
+  }
+}
+
+android {
+  namespace "com.stevenjames.home.googlehome"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+// The SDK is compiled with a newer Kotlin than React Native's.
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+  compilerOptions.freeCompilerArgs.add("-Xskip-metadata-version-check")
+}
+
+dependencies {
+  implementation "com.google.android.gms:play-services-home:17.1.0"
+  implementation "com.google.android.gms:play-services-home-types:17.1.0"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2"
+}

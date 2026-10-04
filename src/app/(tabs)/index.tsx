@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DeviceFormSheet } from '@/components/devices/DeviceFormSheet';
+import { GoogleHomeCard } from '@/components/devices/GoogleHomeCard';
 import { ImportSheet } from '@/components/devices/ImportSheet';
 import { colors, radius, spacing } from '@/components/theme';
 import { Button, Card, Label, Muted, Screen } from '@/components/ui';
@@ -63,6 +64,8 @@ export default function DevicesScreen() {
   return (
     <>
       <Screen>
+        <GoogleHomeCard />
+
         <Button big title="+ Add device" onPress={() => openForm(null)} />
 
         {loaded && devices.length === 0 ? (

@@ -1,8 +1,9 @@
 # Home
 
-An Android app (Expo SDK 58) with three tabs:
+An Android app (Expo SDK 58) with four tabs:
 
 - **Devices**: weekly on/off schedules for Google Home devices, exchanged with Google Home as automation scripts (copy out, import in).
+- **Tasks**: shared household to-dos and reminders with push notifications (Firebase backend in `firebase/`).
 - **Visitor Code**: gets a Les Maisons gate code automatically by SMS (sends the request, reads the reply) and shares it.
 - **Settings**: estate number, request format, default uses, visitor message, and app updates.
 

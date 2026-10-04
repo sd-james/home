@@ -44,6 +44,10 @@ export default function TabsLayout() {
         options={{ title: 'Devices', tabBarIcon: tabIcon('power-plug-outline', 'power-plug') }}
       />
       <Tabs.Screen
+        name="tasks"
+        options={{ title: 'Tasks', tabBarIcon: tabIcon('checkbox-marked-circle-outline', 'checkbox-marked-circle') }}
+      />
+      <Tabs.Screen
         name="visitor"
         options={{ title: 'Visitor Code', tabBarIcon: tabIcon('gate', 'gate-open') }}
       />

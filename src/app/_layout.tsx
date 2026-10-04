@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { colors } from '@/components/theme';
 import { applyUpdateOnLaunch } from '@/lib/updates';
+import { HouseholdProvider } from '@/state/household';
 import { AppStateProvider } from '@/state/stores';
 
 export default function RootLayout() {
@@ -12,16 +13,18 @@ export default function RootLayout() {
 
   return (
     <AppStateProvider>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerTintColor: colors.primary,
-          headerTitleStyle: { color: colors.text },
-          contentStyle: { backgroundColor: colors.background },
-        }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="device/[id]" options={{ title: 'Schedule' }} />
-      </Stack>
+      <HouseholdProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerTintColor: colors.primary,
+            headerTitleStyle: { color: colors.text },
+            contentStyle: { backgroundColor: colors.background },
+          }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="device/[id]" options={{ title: 'Schedule' }} />
+        </Stack>
+      </HouseholdProvider>
     </AppStateProvider>
   );
 }

@@ -46,6 +46,13 @@
           "enforceContrast": false,
           "style": "dark"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#1A73E8",
+          "defaultChannel": "household"
+        }
       ]
     ],
     "extra": {

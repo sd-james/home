@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { UsesStepper } from '@/components/pickers';
+import { HouseholdCard } from '@/components/tasks/HouseholdCard';
 import { spacing } from '@/components/theme';
 import { Button, Card, Field, Label, Muted, Screen } from '@/components/ui';
 import { DEFAULT_SETTINGS, clampUses } from '@/lib/settings';
@@ -48,6 +49,8 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      <HouseholdCard />
+
       <Card>
         <Label>Estate gate codes</Label>
         <Field

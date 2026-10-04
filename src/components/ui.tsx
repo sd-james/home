@@ -135,11 +135,16 @@ export function Row({ children, style }: { children: ReactNode; style?: StylePro
 }
 
 export function Screen({ children, ref }: { children: ReactNode; ref?: Ref<ScrollViewInstance> }) {
+  // In landscape the navigation buttons sit at the side; keep content clear of them.
+  const insets = useAppInsets();
   return (
     <ScrollView
       ref={ref}
       style={{ backgroundColor: colors.background }}
-      contentContainerStyle={styles.screen}
+      contentContainerStyle={[
+        styles.screen,
+        { paddingLeft: spacing.lg + insets.left, paddingRight: spacing.lg + insets.right },
+      ]}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
@@ -167,7 +172,15 @@ export function Sheet({
         style={styles.sheetBackdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: insets.bottom + spacing.lg,
+              paddingLeft: spacing.lg + insets.left,
+              paddingRight: spacing.lg + insets.right,
+            },
+          ]}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">

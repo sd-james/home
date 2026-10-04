@@ -103,7 +103,15 @@ export default function DeviceScheduleScreen() {
           );
         })}
       </Screen>
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: insets.bottom + spacing.md,
+            paddingLeft: spacing.lg + insets.left,
+            paddingRight: spacing.lg + insets.right,
+          },
+        ]}>
         <Button big title="+ Add event" onPress={() => setEditor({ event: null, day: null })} />
       </View>
 

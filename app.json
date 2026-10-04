@@ -33,7 +33,9 @@
       }
     },
     "plugins": [
+      "expo-router",
       "expo-status-bar"
-    ]
+    ],
+    "scheme": "home"
   }
 }

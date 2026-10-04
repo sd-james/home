@@ -1,6 +1,12 @@
 # Home
 
-An Expo app (SDK 58) that runs in Expo Go.
+An Expo app (SDK 58) that runs in Expo Go, with three tabs:
+
+- **Devices**: weekly on/off schedules for Google Home devices, exchanged with Google Home as automation scripts (copy out, import in).
+- **Visitor Code**: request a Les Maisons gate code by SMS, read the reply and share the code.
+- **Settings**: estate number, request format, default uses and visitor message.
+
+See CLAUDE.md for the code structure.
 
 On Android, use Expo Go 58.0.2 or later (https://github.com/expo/expo-go-releases/releases). Expo Go 57.0.9 does not send your sign-in when downloading updates, so it cannot open this (private) project.
 

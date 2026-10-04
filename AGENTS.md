@@ -25,7 +25,8 @@ Run lint and typecheck before declaring any task done.
 
 ## Navigation & Routing
 
-- The app currently has a single screen in `App.tsx`. If navigation is added, use **Expo Router** (bundled in Expo Go): routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators.
+- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
+- In SDK 58, import `Stack` from `expo-router/stack` and JS bottom tabs from `expo-router/js-tabs` (the `Tabs` export on `expo-router` is deprecated). Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
 
 ## Building with EAS

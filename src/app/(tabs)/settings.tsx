@@ -1,12 +1,12 @@
+import { useState } from 'react';
 import { Alert, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAppInsets } from '@/components/insets';
 import { UsesStepper } from '@/components/pickers';
 import { spacing } from '@/components/theme';
 import { Button, Card, Field, Label, Muted, Screen } from '@/components/ui';
 import { DEFAULT_SETTINGS, clampUses } from '@/lib/settings';
 import type { Settings } from '@/lib/types';
+import { checkAndApplyUpdate, describeCurrentUpdate } from '@/lib/updates';
 import { buildRequestMessage, fillTemplate } from '@/lib/visitorCode';
 import { useSettingsStore } from '@/state/stores';
 
@@ -20,8 +20,21 @@ const EXAMPLE_CODE = {
 export default function SettingsScreen() {
   const { value: settings, set } = useSettingsStore();
   const update = (changes: Partial<Settings>) => set((s) => ({ ...s, ...changes }));
-  const reported = useSafeAreaInsets();
-  const used = useAppInsets();
+  const [checking, setChecking] = useState(false);
+  const current = describeCurrentUpdate();
+
+  const checkForUpdates = async () => {
+    setChecking(true);
+    try {
+      const outcome = await checkAndApplyUpdate(); // Reloads the app when there's an update.
+      if (outcome === 'up-to-date') Alert.alert('Up to date', 'You have the latest version.');
+      if (outcome === 'unavailable') Alert.alert('Updates are off', 'This build doesn’t receive updates.');
+    } catch (e) {
+      Alert.alert('Couldn’t check for updates', e instanceof Error ? e.message : String(e));
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const reset = () =>
     Alert.alert(
@@ -73,10 +86,17 @@ export default function SettingsScreen() {
 
       <Button title="Reset settings to defaults" variant="danger" onPress={reset} />
 
-      <Muted>
-        Screen edges: top {Math.round(reported.top)}, bottom {Math.round(reported.bottom)} reported
-        {used.bottom !== reported.bottom ? `, bottom ${Math.round(used.bottom)} used` : ''}
-      </Muted>
+      <Card>
+        <Label>App updates</Label>
+        <Muted>{current.title}</Muted>
+        {current.detail ? <Muted>{current.detail}</Muted> : null}
+        <Button
+          title={checking ? 'Checking…' : 'Check for updates'}
+          variant="secondary"
+          onPress={checkForUpdates}
+          disabled={checking}
+        />
+      </Card>
     </Screen>
   );
 }

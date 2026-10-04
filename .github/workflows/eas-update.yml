@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   update:
-    name: Publish to Expo Go
+    name: Publish update to the installed app
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +40,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check types, lint and tests
+        run: |
+          npx tsc --noEmit
+          npx expo lint
+          npm test
+
       - name: Publish update
         env:
           MESSAGE: ${{ github.event.head_commit.message }}
-        run: eas update --channel main --message "$MESSAGE" --environment production --non-interactive
+        # Reaches installed builds on channel "main" whose fingerprint (runtime
+        # version) matches this commit. Native changes need a new build instead.
+        run: eas update --channel main --platform android --message "$MESSAGE" --environment production --non-interactive

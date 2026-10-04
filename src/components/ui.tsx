@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -9,6 +9,8 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
+  type ScrollViewInstance,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
@@ -90,8 +92,20 @@ export function Chip({
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({
+  children,
+  style,
+  onLayout,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onLayout?: (event: LayoutChangeEvent) => void;
+}) {
+  return (
+    <View style={[styles.card, style]} onLayout={onLayout}>
+      {children}
+    </View>
+  );
 }
 
 export function Label({ children }: { children: ReactNode }) {
@@ -120,9 +134,10 @@ export function Row({ children, style }: { children: ReactNode; style?: StylePro
   return <View style={[styles.row, style]}>{children}</View>;
 }
 
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({ children, ref }: { children: ReactNode; ref?: Ref<ScrollViewInstance> }) {
   return (
     <ScrollView
+      ref={ref}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.screen}
       keyboardShouldPersistTaps="handled">

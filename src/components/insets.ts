@@ -5,11 +5,11 @@ import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-conte
 const ANDROID_NAV_BAR = 48;
 
 /**
- * Safe-area insets with a fallback for Android Expo Go, which can report a
- * bottom inset of 0 even though the app is drawn behind the navigation bar
- * (seen on a Pixel with Expo Go 58.0.2). A real edge-to-edge Android screen
- * always has a bottom inset (≥24dp for gesture navigation), so 0 means the
- * value was lost; use the navigation bar's size instead.
+ * Safe-area insets with a guard for Android: when the app is drawn behind the
+ * navigation bar but the bottom inset reads 0 (seen in Expo Go 58.0.2 on a
+ * Pixel), fall back to the navigation bar's size. A real edge-to-edge Android
+ * screen always has a bottom inset (≥24dp for gesture navigation), so this
+ * does nothing when insets are reported correctly.
  */
 export function useAppInsets(): EdgeInsets {
   const insets = useSafeAreaInsets();

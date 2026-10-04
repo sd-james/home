@@ -1,265 +1,214 @@
 import * as Clipboard from 'expo-clipboard';
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 
 import { UsesStepper } from '@/components/pickers';
-import { colors, radius, spacing } from '@/components/theme';
-import { Button, Card, Field, Label, Muted, Row, Screen, Sheet } from '@/components/ui';
+import { colors, spacing } from '@/components/theme';
+import { Button, Card, Label, Muted, Screen } from '@/components/ui';
+import { ManualReplyCard } from '@/components/visitor/ManualReplyCard';
+import { RecentCodes } from '@/components/visitor/RecentCodes';
+import { ShareCodeCard } from '@/components/visitor/ShareCodeCard';
+import { REPLY_TIMEOUT_MS, isAutoCodeAvailable, sendCodeRequest, waitForCodeReply } from '@/lib/autoCode';
+import type { ParsedReply } from '@/lib/codeReply';
 import { newId } from '@/lib/id';
 import { clampUses } from '@/lib/settings';
-import { composeSms, pickContact, type PickedContact } from '@/lib/sms';
+import { composeSms } from '@/lib/sms';
+import { ensureSmsPermissions } from '@/lib/smsPermissions';
 import type { VisitorCode } from '@/lib/types';
-import {
-  buildRequestMessage,
-  describeExpiry,
-  fillTemplate,
-  formatDateTime,
-  isExpired,
-  parseReply,
-} from '@/lib/visitorCode';
+import { buildRequestMessage } from '@/lib/visitorCode';
 import { useSettingsStore, useVisitorCodesStore, withRecentCode } from '@/state/stores';
+
+type Phase =
+  | { kind: 'idle' }
+  | { kind: 'sending' }
+  | { kind: 'waiting'; since: number; deadline: number }
+  /** The automatic flow didn't work; show the manual flow with the reason. */
+  | { kind: 'manual'; reason: string | null; canWaitAgain?: { since: number }; permissionBlocked?: boolean };
 
 export default function VisitorCodeScreen() {
   const { value: settings } = useSettingsStore();
   const { value: recent, set: setRecent } = useVisitorCodesStore();
+  const auto = isAutoCodeAvailable();
 
   // Follows the default from Settings until the user picks a number here.
   const [pickedUses, setPickedUses] = useState<number | null>(null);
   const uses = pickedUses ?? settings.defaultUses;
-  const [replyText, setReplyText] = useState('');
-  const [current, setCurrent] = useState<VisitorCode | null>(null);
-  // An edited message applies only to the code it was edited for.
-  const [messageEdit, setMessageEdit] = useState<{ codeId: string; text: string } | null>(null);
-  const message = !current
-    ? ''
-    : messageEdit?.codeId === current.id
-      ? messageEdit.text
-      : fillTemplate(settings.visitorTemplate, current);
-  const setMessage = (text: string) => current && setMessageEdit({ codeId: current.id, text });
-  const [contact, setContact] = useState<PickedContact | null>(null);
-
   const requestMessage = buildRequestMessage(settings.requestFormat, uses);
 
-  const readReply = (text: string, save: boolean) => {
-    setReplyText(text);
-    const parsed = parseReply(text);
-    if (!parsed) {
-      setCurrent(null);
-      return;
-    }
-    const code: VisitorCode = { id: newId(), requestedAt: new Date().toISOString(), ...parsed };
-    setCurrent(code);
-    if (save) setRecent((list) => withRecentCode(list, code));
-  };
+  const [phase, setPhase] = useState<Phase>(auto ? { kind: 'idle' } : { kind: 'manual', reason: null });
+  const [current, setCurrent] = useState<VisitorCode | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
-  const pasteReply = async () => {
-    const text = await Clipboard.getStringAsync();
-    if (!text.trim()) {
-      Alert.alert('Clipboard is empty', 'Copy the estate’s reply in your SMS app first.');
-      return;
-    }
-    readReply(text, true);
-  };
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollToShare = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  /** Saves a typed-in code to the recent list once it's used. */
+  // Stop waiting if the screen goes away.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Countdown while waiting.
+  useEffect(() => {
+    if (phase.kind !== 'waiting') return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [phase.kind]);
+
   const remember = (code: VisitorCode) => setRecent((list) => withRecentCode(list, code));
 
-  const copyCode = async () => {
-    if (!current) return;
-    await Clipboard.setStringAsync(current.code);
-    remember(current);
-    Alert.alert('Copied', `Code ${current.code} is on the clipboard.`);
+  /** Shows a code; `save` adds it to recent codes now (typed codes are saved once used). */
+  const showCode = (reply: ParsedReply, { copied, save }: { copied: boolean; save: boolean }) => {
+    const code: VisitorCode = { id: newId(), requestedAt: new Date().toISOString(), ...reply };
+    setCurrent(code);
+    if (save) remember(code);
+    setNote(copied ? 'Code copied to the clipboard.' : null);
+    scrollToShare.current = true;
   };
 
-  const share = async () => {
-    if (!current || !message.trim()) return;
-    remember(current);
-    await Share.share({ message });
+  const openSmsApp = () => composeSms(settings.estateNumber, requestMessage);
+
+  const wait = async (since: number) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setNow(Date.now());
+    setPhase({ kind: 'waiting', since, deadline: Date.now() + REPLY_TIMEOUT_MS });
+    const result = await waitForCodeReply({ from: settings.estateNumber, since, signal: controller.signal });
+    if (controller.signal.aborted && result.kind !== 'code') return;
+    if (result.kind === 'code') {
+      await Clipboard.setStringAsync(result.reply.code);
+      showCode(result.reply, { copied: true, save: true });
+      setPhase({ kind: 'idle' });
+    } else if (result.kind === 'timeout') {
+      setPhase({
+        kind: 'manual',
+        reason: 'No reply from the estate within 2 minutes.',
+        canWaitAgain: { since },
+      });
+    }
   };
 
-  const sendToContact = async () => {
-    if (!current || !message.trim()) return;
-    const picked = await pickContact();
-    if (!picked) return;
-    if (picked.phones.length === 0) {
-      Alert.alert('No phone number', `${picked.name} has no phone number saved.`);
+  const getCode = async () => {
+    const permission = await ensureSmsPermissions();
+    if (permission !== 'granted') {
+      setPhase({
+        kind: 'manual',
+        reason:
+          permission === 'blocked'
+            ? 'SMS permission is off for Home. Allow it in the phone’s settings to get codes automatically.'
+            : 'Without SMS permission, request the code from your SMS app.',
+        permissionBlocked: permission === 'blocked',
+      });
+      await openSmsApp();
       return;
     }
-    remember(current);
-    if (picked.phones.length === 1) await composeSms(picked.phones[0].number, message);
-    else setContact(picked);
+    setPhase({ kind: 'sending' });
+    let since: number;
+    try {
+      since = await sendCodeRequest(settings.estateNumber, requestMessage);
+    } catch (e) {
+      setPhase({
+        kind: 'manual',
+        reason: e instanceof Error ? e.message : 'The SMS couldn’t be sent.',
+      });
+      return;
+    }
+    await wait(since);
   };
 
-  const parsedFromText = useMemo(() => (replyText.trim() ? parseReply(replyText) : null), [replyText]);
-  const expired = current ? isExpired(current) : false;
+  const cancel = () => {
+    abortRef.current?.abort();
+    setPhase({ kind: 'manual', reason: 'Stopped waiting. If the reply comes in, paste it below.' });
+  };
+
+  const busy = phase.kind === 'sending' || phase.kind === 'waiting';
+  const secondsLeft = phase.kind === 'waiting' ? Math.max(0, Math.ceil((phase.deadline - now) / 1000)) : 0;
 
   return (
-    <>
-      <Screen>
-        <Card>
-          <Label>1. Request a code</Label>
-          <UsesStepper value={uses} onChange={(n) => setPickedUses(clampUses(n))} />
-          <Button
-            big
-            title={`Request code (${requestMessage})`}
-            onPress={() => composeSms(settings.estateNumber, requestMessage)}
-          />
-          <Muted>
-            Opens your SMS app with “{requestMessage}” to {settings.estateNumber}. You tap send.
-          </Muted>
-        </Card>
-
-        <Card>
-          <Label>2. Read the reply</Label>
-          <Button big title="Paste reply" variant="secondary" onPress={pasteReply} />
-          <Field
-            label="Or type / paste it here"
-            multiline
-            value={replyText}
-            onChangeText={(t) => readReply(t, false)}
-            placeholder="Les Maisons TAP code 61359 valid for 9 uses till 2026-10-04 23:59:59"
-          />
-          {replyText.trim() && !parsedFromText ? (
-            <View style={styles.warning}>
-              <Text style={styles.warningTitle}>Couldn’t find a code in this text:</Text>
-              <Text style={styles.raw}>{replyText.trim()}</Text>
-            </View>
-          ) : null}
-        </Card>
-
-        {current ? (
-          <Card>
-            <Label>3. Share the code</Label>
-            <View style={[styles.codeBox, expired && { opacity: 0.5 }]}>
-              <Text style={styles.code} selectable>
-                {current.code}
+    <Screen ref={scrollRef}>
+      <Card>
+        <Label>Visitor gate code</Label>
+        <UsesStepper value={uses} onChange={(n) => setPickedUses(clampUses(n))} />
+        {auto ? (
+          busy ? (
+            <View style={styles.waiting}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.waitingText}>
+                {phase.kind === 'sending'
+                  ? `Sending “${requestMessage}”…`
+                  : `Waiting for reply… ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
               </Text>
-              <Text style={styles.codeMeta}>
-                {current.uses === null ? 'Uses unknown' : `${current.uses} ${current.uses === 1 ? 'use' : 'uses'}`}
-                {' · '}
-                {expired ? 'Expired ' : 'Until '}
-                {describeExpiry(current)}
-              </Text>
+              {phase.kind === 'waiting' ? <Button title="Cancel" variant="ghost" onPress={cancel} /> : null}
             </View>
-            <Button big title="Copy code" onPress={copyCode} />
-            <Field
-              label="Message (edit for this share only)"
-              multiline
-              value={message}
-              onChangeText={setMessage}
+          ) : (
+            <>
+              <Button big title={`Get code (${requestMessage})`} onPress={getCode} />
+              <Muted>
+                Texts “{requestMessage}” to {settings.estateNumber} and waits for the code.
+              </Muted>
+            </>
+          )
+        ) : (
+          <Muted>This phone can’t send SMS from Home, so request the code by hand below.</Muted>
+        )}
+      </Card>
+
+      {current ? (
+        <ShareCodeCard
+          key={current.id}
+          code={current}
+          template={settings.visitorTemplate}
+          note={note}
+          onUsed={remember}
+          onLayout={(e) => {
+            if (!scrollToShare.current) return;
+            scrollToShare.current = false;
+            scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - spacing.lg), animated: true });
+          }}
+        />
+      ) : null}
+
+      {phase.kind === 'manual' ? (
+        <>
+          {phase.canWaitAgain ? (
+            <Button
+              title="Keep waiting for the reply"
+              variant="secondary"
+              onPress={() => phase.canWaitAgain && wait(phase.canWaitAgain.since)}
             />
-            <Pressable onPress={() => setMessageEdit(null)} hitSlop={8}>
-              <Text style={styles.link}>Reset message from template</Text>
-            </Pressable>
-            <Row>
-              <Button title="Share" onPress={share} style={{ flex: 1 }} disabled={!message.trim()} />
-              <Button
-                title="Send by SMS"
-                variant="secondary"
-                onPress={sendToContact}
-                style={{ flex: 1 }}
-                disabled={!message.trim()}
-              />
-            </Row>
-          </Card>
-        ) : null}
-
-        {recent.length > 0 ? (
-          <Card>
-            <Label>Recent codes</Label>
-            <Muted>Tap one to share it again.</Muted>
-            {recent.map((code) => {
-              const old = isExpired(code);
-              const selected = current?.code === code.code && current?.expiresAt === code.expiresAt;
-              return (
-                <Pressable
-                  key={code.id}
-                  onPress={() => {
-                    setReplyText('');
-                    setCurrent(code);
-                  }}
-                  onLongPress={() =>
-                    Alert.alert(`Remove code ${code.code}?`, undefined, [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Remove',
-                        style: 'destructive',
-                        onPress: () => setRecent((list) => list.filter((c) => c.id !== code.id)),
-                      },
-                    ])
-                  }
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.recent,
-                    selected && styles.recentSelected,
-                    old && { opacity: 0.45 },
-                    pressed && { opacity: 0.6 },
-                  ]}>
-                  <Text style={styles.recentCode}>{code.code}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.recentMeta}>
-                      {code.uses === null ? '?' : code.uses} {code.uses === 1 ? 'use' : 'uses'} ·{' '}
-                      {old ? 'expired' : `until ${describeExpiry(code)}`}
-                    </Text>
-                    <Text style={styles.recentDate}>Requested {formatDateTime(code.requestedAt)}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Card>
-        ) : null}
-      </Screen>
-
-      <Sheet visible={contact !== null} title={`Text ${contact?.name ?? ''}`} onClose={() => setContact(null)}>
-        <Muted>Pick a number:</Muted>
-        {contact?.phones.map((phone) => (
-          <Button
-            key={`${phone.label}-${phone.number}`}
-            title={phone.label ? `${phone.number} (${phone.label})` : phone.number}
-            variant="secondary"
-            onPress={async () => {
-              setContact(null);
-              await composeSms(phone.number, message);
-            }}
+          ) : null}
+          {phase.permissionBlocked ? (
+            <Button title="Open phone settings" variant="secondary" onPress={() => Linking.openSettings()} />
+          ) : null}
+          <ManualReplyCard
+            requestMessage={requestMessage}
+            estateNumber={settings.estateNumber}
+            reason={phase.reason}
+            onOpenSmsApp={openSmsApp}
+            onReply={(reply, pasted) => showCode(reply, { copied: false, save: pasted })}
           />
-        ))}
-      </Sheet>
-    </>
+        </>
+      ) : auto && !busy ? (
+        <Pressable onPress={() => setPhase({ kind: 'manual', reason: null })} hitSlop={8} accessibilityRole="button">
+          <Text style={styles.link}>Enter a reply by hand</Text>
+        </Pressable>
+      ) : null}
+
+      <RecentCodes
+        codes={recent}
+        selectedId={current?.id ?? null}
+        onSelect={(code) => {
+          setCurrent(code);
+          setNote(null);
+          scrollToShare.current = true;
+        }}
+        onRemove={(code) => setRecent((list) => list.filter((c) => c.id !== code.id))}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  codeBox: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.chip,
-    gap: spacing.xs,
-  },
-  code: {
-    fontSize: 48,
-    fontWeight: '800',
-    letterSpacing: 6,
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
-  },
-  codeMeta: { fontSize: 16, color: colors.text, textAlign: 'center', paddingHorizontal: spacing.md },
-  link: { fontSize: 15, color: colors.primary, fontWeight: '600' },
-  warning: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
-  warningTitle: { fontSize: 15, fontWeight: '700', color: colors.danger },
-  raw: { fontSize: 15, color: colors.text },
-  recent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minHeight: 60,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-  },
-  recentSelected: { borderWidth: 2, borderColor: colors.primary },
-  recentCode: { fontSize: 22, fontWeight: '800', color: colors.text, minWidth: 90, fontVariant: ['tabular-nums'] },
-  recentMeta: { fontSize: 15, color: colors.text },
-  recentDate: { fontSize: 13, color: colors.muted },
+  waiting: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  waitingText: { fontSize: 18, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+  link: { fontSize: 16, color: colors.primary, fontWeight: '600', textAlign: 'center', paddingVertical: spacing.sm },
 });

@@ -1,7 +1,7 @@
 /**
  * Everything that reads or writes Google Home automation scripts (the YAML
  * used by the script editor at https://home.google.com) lives in this file.
- * Expo Go can't talk to Google Home directly, so schedules travel as scripts
+ * The app can't talk to Google Home directly, so schedules travel as scripts
  * the user copies in and out. A future direct Google Home connection should
  * replace this module behind the same exported functions.
  */

@@ -1,29 +1,33 @@
 # Home
 
-An Expo app (SDK 58) that runs in Expo Go, with three tabs:
+An Android app (Expo SDK 58) with three tabs:
 
 - **Devices**: weekly on/off schedules for Google Home devices, exchanged with Google Home as automation scripts (copy out, import in).
-- **Visitor Code**: request a Les Maisons gate code by SMS, read the reply and share the code.
-- **Settings**: estate number, request format, default uses and visitor message.
+- **Visitor Code**: gets a Les Maisons gate code automatically by SMS (sends the request, reads the reply) and shares it. Falls back to the SMS app and pasting the reply.
+- **Settings**: estate number, request format, default uses, visitor message, and app updates.
 
-See CLAUDE.md for the code structure.
+See CLAUDE.md for the code structure and rules.
 
-On Android, use Expo Go 58.0.2 or later (https://github.com/expo/expo-go-releases/releases). Expo Go 57.0.9 does not send your sign-in when downloading updates, so it cannot open this (private) project.
+## Install on a phone
+
+1. In GitHub, open **Actions → Build Android → Run workflow** (branch `main`).
+2. When the job finishes it links to the build on expo.dev. The build itself takes about 10–20 minutes.
+3. On the phone, open the build page on expo.dev (or scan its QR code) and tap **Install**. Allow installing apps from your browser if Android asks.
+
+Only needed for the first install and after native changes. Everything else arrives as an update.
+
+## Updates
+
+Every push to `main` checks types, lint and tests, then publishes an EAS Update to the `main` channel (`.github/workflows/eas-update.yml`). The app applies it the next time it opens, or straight away from Settings → **Check for updates**.
+
+Both workflows need the `EXPO_TOKEN` repository secret (a personal access token for the `sd-james` Expo account, from https://expo.dev/settings/access-tokens).
 
 ## Develop
 
 ```sh
 npm install
-npx expo start
+npm test
+npx tsc --noEmit && npx expo lint
 ```
 
-Scan the QR code with Expo Go.
-
-## Publishing
-
-Every push to `main` publishes an EAS Update to the `main` channel (see `.github/workflows/eas-update.yml`). It needs:
-
-- the `EXPO_TOKEN` repository secret (create one at https://expo.dev/settings/access-tokens), and
-- the Expo project ID in `app.json` (`updates.url` and `extra.eas.projectId`).
-
-To open the latest version in Expo Go, scan a QR code for `exp://u.expo.dev/08996c47-64d7-45fd-b395-a40390e55765?channel-name=main`.
+To run against a local dev server, build a development client (`eas build --profile development`, not set up yet) — the app can't run in Expo Go.

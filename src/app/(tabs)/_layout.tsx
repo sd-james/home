@@ -8,8 +8,9 @@ import { colors } from '@/components/theme';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-/** Tab bar height above the navigation bar. */
-const TAB_BAR_HEIGHT = 60;
+/** Tab bar height above the navigation bar, and the gap kept below the labels. */
+const TAB_BAR_HEIGHT = 64;
+const LABEL_GAP = 8;
 
 function tabIcon(name: IconName, focusedName: IconName) {
   function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
@@ -27,8 +28,14 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
-        // Set explicitly: the tab bar's own calculation used the too-small inset.
-        tabBarStyle: { height: TAB_BAR_HEIGHT + bottom, paddingBottom: bottom, paddingTop: 6 },
+        // The tab bar's white background runs under the (scrim-free) navigation
+        // buttons; the icons and labels stay above them with a small gap.
+        tabBarStyle: {
+          height: TAB_BAR_HEIGHT + bottom,
+          paddingBottom: bottom + LABEL_GAP,
+          paddingTop: 6,
+          backgroundColor: colors.card,
+        },
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
       }}>

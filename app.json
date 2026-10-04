@@ -20,8 +20,7 @@
       "permissions": [
         "android.permission.SEND_SMS",
         "android.permission.RECEIVE_SMS",
-        "android.permission.READ_SMS",
-        "android.permission.READ_CONTACTS"
+        "android.permission.READ_SMS"
       ]
     },
     "ios": {
@@ -40,7 +39,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-navigation-bar",
+        {
+          "enforceContrast": false,
+          "style": "dark"
+        }
+      ]
     ],
     "extra": {
       "eas": {

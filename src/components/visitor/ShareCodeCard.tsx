@@ -2,12 +2,11 @@ import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import { Alert, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
-import { composeSms, pickContact, type PickedContact } from '@/lib/sms';
 import type { VisitorCode } from '@/lib/types';
 import { describeExpiry, fillTemplate, isExpired } from '@/lib/visitorCode';
 
 import { colors, radius, spacing } from '../theme';
-import { Button, Card, Field, Label, Muted, Row, Sheet } from '../ui';
+import { Button, Card, Field, Label } from '../ui';
 
 type Props = {
   code: VisitorCode;
@@ -23,7 +22,6 @@ export function ShareCodeCard({ code, template, note, onUsed, onLayout }: Props)
   // An edited message applies only to the code it was edited for.
   const [edit, setEdit] = useState<{ codeId: string; text: string } | null>(null);
   const message = edit?.codeId === code.id ? edit.text : fillTemplate(template, code);
-  const [contact, setContact] = useState<PickedContact | null>(null);
   const expired = isExpired(code);
 
   const copyCode = async () => {
@@ -35,18 +33,6 @@ export function ShareCodeCard({ code, template, note, onUsed, onLayout }: Props)
   const share = async () => {
     onUsed(code);
     await Share.share({ message });
-  };
-
-  const sendToContact = async () => {
-    const picked = await pickContact();
-    if (!picked) return;
-    if (picked.phones.length === 0) {
-      Alert.alert('No phone number', `${picked.name} has no phone number saved.`);
-      return;
-    }
-    onUsed(code);
-    if (picked.phones.length === 1) await composeSms(picked.phones[0].number, message);
-    else setContact(picked);
   };
 
   return (
@@ -64,10 +50,7 @@ export function ShareCodeCard({ code, template, note, onUsed, onLayout }: Props)
           {describeExpiry(code)}
         </Text>
       </View>
-      <Row>
-        <Button big title="Share" onPress={share} style={{ flex: 1 }} disabled={!message.trim()} />
-        <Button big title="Send by SMS" variant="secondary" onPress={sendToContact} style={{ flex: 1 }} disabled={!message.trim()} />
-      </Row>
+      <Button big title="Share" onPress={share} disabled={!message.trim()} />
       <Button title="Copy code" variant="secondary" onPress={copyCode} />
       <Field
         label="Message (edit for this share only)"
@@ -78,21 +61,6 @@ export function ShareCodeCard({ code, template, note, onUsed, onLayout }: Props)
       <Pressable onPress={() => setEdit(null)} hitSlop={8} accessibilityRole="button">
         <Text style={styles.link}>Reset message from template</Text>
       </Pressable>
-
-      <Sheet visible={contact !== null} title={`Text ${contact?.name ?? ''}`} onClose={() => setContact(null)}>
-        <Muted>Pick a number:</Muted>
-        {contact?.phones.map((phone) => (
-          <Button
-            key={`${phone.label}-${phone.number}`}
-            title={phone.label ? `${phone.number} (${phone.label})` : phone.number}
-            variant="secondary"
-            onPress={async () => {
-              setContact(null);
-              await composeSms(phone.number, message);
-            }}
-          />
-        ))}
-      </Sheet>
     </Card>
   );
 }

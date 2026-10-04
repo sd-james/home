@@ -48,7 +48,6 @@ src/
     codeReply.test.ts         Tests for codeReply.ts (`npm test`, Node test runner via tsx)
     autoCode.ts               Send request + wait for the reply (listener + inbox polling)
     smsPermissions.ts         Ask for SEND/RECEIVE/READ_SMS with an explanation first
-    sms.ts                    Open the SMS app, pick a contact (expo-sms, expo-contacts)
     updates.ts                Check/apply EAS updates, describe the current update
     settings.ts               Default settings
   state/
@@ -63,7 +62,7 @@ modules/
 - Screens stay thin: put logic in `src/lib/` and shared state in `src/state/stores.tsx`. A new feature (e.g. shared lists) gets its own route(s), a `lib/` module, a store in `stores.tsx` and, if needed, a `components/<feature>/` folder.
 - Stored data is revived through the `revive*` functions in `stores.tsx`, so old data keeps loading when fields change. Change a storage key's version only for a breaking change.
 - Sheets (`components/devices/*Sheet.tsx`) mount their contents only while open so their form state starts fresh each time; follow that pattern instead of resetting state in effects (the linter's React Compiler rules flag that).
-- Use `useAppInsets()` (`components/insets.ts`), not `useSafeAreaInsets()`, for bottom spacing: on Android the reported bottom inset is too small (the Pixel's 3-button bar covered the tabs), so it is at least 48dp. The tab bar's height and bottom padding are set from it explicitly in `(tabs)/_layout.tsx`.
+- **Navigation bar (Pixel, Android 15+):** the app is drawn edge-to-edge and Android reports the navigation bar's height correctly as the bottom safe-area inset (48dp for 3-button navigation). What looked like the tab bar overlapping the buttons was Android's grey *contrast scrim* over that strip; it is turned off with the `expo-navigation-bar` plugin (`enforceContrast: false`, dark buttons) in `app.json`, so the white tab bar runs under the buttons. The tab bar's height and bottom padding are set from the inset in `(tabs)/_layout.tsx`, with a small gap below the labels. Use `useAppInsets()` (`components/insets.ts`) for bottom spacing.
 - Icons: `@expo/vector-icons` (MaterialCommunityIcons). It is JS + fonts on top of `expo-font`, which is already in the build, so it doesn't change the fingerprint.
 - Keep it usable with one thumb: big buttons (`TOUCH` = 52px minimum), bottom sheets, few taps.
 
@@ -96,7 +95,7 @@ automations:
 
 - Request: text the request format (default `TAP{uses}`, e.g. `TAP9`) to the estate number (default `0637127256`).
 - Reply, e.g.: `Les Maisons TAP code 61359 valid for 9 uses till 2026-10-04 23:59:59`
-- **Automatic flow** (Android build with the `HomeSms` module): "Get code" asks for SMS permissions the first time (with an explanation), sends the request with `SmsManager`, then waits up to 2 minutes for a reply from the estate number. It listens for incoming SMS (`SMS_RECEIVED` broadcast → `onSmsReceived` event) and also reads the inbox every 4 seconds in case the listener misses it. On a reply it shows the code, copies it to the clipboard, saves it to recent codes and scrolls to the share options.
+- **Automatic flow** (Android build with the `HomeSms` module): "Get code" asks for SMS permissions the first time (with an explanation), sends the request with `SmsManager`, then waits up to 2 minutes for a reply from the estate number. It listens for incoming SMS (`SMS_RECEIVED` broadcast → `onSmsReceived` event) and also reads the inbox every 4 seconds in case the listener misses it. On a reply it shows the code, copies it to the clipboard, saves it to recent codes and scrolls to the share options (Share sheet, Copy code).
 - No manual flow: if permission is refused, sending fails or no reply arrives in time, the screen says why and offers "Keep waiting" (after a timeout) or "Open phone settings" (permission blocked).
 - Recent codes disappear once expired (`isStillValid` in `lib/visitorCode.ts`; codes without a readable expiry are kept for 24 hours). They are filtered when shown, saved and loaded.
 - `parseReply` in `lib/codeReply.ts` is forgiving: the code is the number after "code" (else the first 4–8 digit number that isn't part of a date), uses is the number before "uses/entries/times", and the expiry is a `YYYY-MM-DD[ HH:MM[:SS]]` date (local time; a date alone means 23:59:59). `isSameNumber` matches the sender loosely (`063…`, `+2763…`, spaces) by comparing the last 9 digits. Add a test to `codeReply.test.ts` for any new reply format.

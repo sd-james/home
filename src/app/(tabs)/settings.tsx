@@ -1,5 +1,7 @@
 import { Alert, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAppInsets } from '@/components/insets';
 import { UsesStepper } from '@/components/pickers';
 import { spacing } from '@/components/theme';
 import { Button, Card, Field, Label, Muted, Screen } from '@/components/ui';
@@ -18,6 +20,8 @@ const EXAMPLE_CODE = {
 export default function SettingsScreen() {
   const { value: settings, set } = useSettingsStore();
   const update = (changes: Partial<Settings>) => set((s) => ({ ...s, ...changes }));
+  const reported = useSafeAreaInsets();
+  const used = useAppInsets();
 
   const reset = () =>
     Alert.alert(
@@ -68,6 +72,11 @@ export default function SettingsScreen() {
       </Card>
 
       <Button title="Reset settings to defaults" variant="danger" onPress={reset} />
+
+      <Muted>
+        Screen edges: top {Math.round(reported.top)}, bottom {Math.round(reported.bottom)} reported
+        {used.bottom !== reported.bottom ? `, bottom ${Math.round(used.bottom)} used` : ''}
+      </Muted>
     </Screen>
   );
 }

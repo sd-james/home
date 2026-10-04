@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router/js-tabs';
 import { Text, type ColorValue } from 'react-native';
 
+import { useAppInsets } from '@/components/insets';
 import { colors } from '@/components/theme';
 
 function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
@@ -8,13 +9,14 @@ function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
 }
 
 export default function TabsLayout() {
+  const insets = useAppInsets();
   return (
     <Tabs
+      safeAreaInsets={{ bottom: insets.bottom }}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
-        tabBarStyle: { minHeight: 64 },
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
       }}>

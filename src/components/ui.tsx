@@ -13,8 +13,8 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAppInsets } from './insets';
 import { colors, radius, spacing, TOUCH } from './theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -145,7 +145,7 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppInsets();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView

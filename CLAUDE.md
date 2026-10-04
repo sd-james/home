@@ -45,6 +45,7 @@ src/
 - Screens stay thin: put logic in `src/lib/` and shared state in `src/state/stores.tsx`. A new feature (e.g. shared lists) gets its own route(s), a `lib/` module, a store in `stores.tsx` and, if needed, a `components/<feature>/` folder.
 - Stored data is revived through the `revive*` functions in `stores.tsx`, so old data keeps loading when fields change. Change a storage key's version only for a breaking change.
 - Sheets (`components/devices/*Sheet.tsx`) mount their contents only while open so their form state starts fresh each time; follow that pattern instead of resetting state in effects (the linter's React Compiler rules flag that).
+- Use `useAppInsets()` (`components/insets.ts`), not `useSafeAreaInsets()`, for bottom spacing: Android Expo Go can report a bottom inset of 0 while the app is drawn behind the navigation bar. Settings shows the raw values at the bottom.
 - Keep it usable with one thumb: big buttons (`TOUCH` = 52px minimum), bottom sheets, few taps.
 
 ## Google Home schedules

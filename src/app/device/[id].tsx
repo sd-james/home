@@ -2,10 +2,10 @@ import { useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CopyDaySheet } from '@/components/devices/CopyDaySheet';
 import { EventEditorSheet, type EventDraft } from '@/components/devices/EventEditorSheet';
+import { useAppInsets } from '@/components/insets';
 import { colors, radius, spacing } from '@/components/theme';
 import { Button, Card, Muted, Screen } from '@/components/ui';
 import { DAYS, DAY_LONG, dayOfDate } from '@/lib/days';
@@ -15,7 +15,7 @@ import { useDevicesStore } from '@/state/stores';
 
 export default function DeviceScheduleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
+  const insets = useAppInsets();
   const { value: devices, set: setDevices, loaded } = useDevicesStore();
   const device = devices.find((d) => d.id === id);
 
